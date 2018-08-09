@@ -1,0 +1,220 @@
+package sintatico;
+import java.io.*;
+import java_cup.runtime.*;
+import sintatico.Yylex;
+
+parser code
+{:
+        /* Reporte de erro encontrado. */
+        public void report_error(String message, Object info) {
+            StringBuilder m = new StringBuilder("Error" );
+            if (info instanceof java_cup.runtime.Symbol) {
+                java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+                if (s.left >= 0) {                
+                    m.append(" in line "+(s.right+1));
+                    //if (s.right >= 0)
+                        //m.append(", column "+(s.left+1));
+                }
+            }
+            m.append(" : "+message);
+            System.err.println(m);
+        }
+
+        /* Quando encontra um erro de onde o sistema nao pode
+            recuperar. Envia a mensagem
+            de erro. */
+        public void report_fatal_error(String message, Object info) {
+            report_error(message, info);
+            System.exit(1);
+        }
+        /* Metodo main para garantir a execucao do analisador
+        lexico e sintatico, alem disso, passa como parametro a tabela
+        de simbolos correspondentes. */                                
+
+        public static void main(String[] args){            
+            try {
+                AnalisadorSintatico asin = new AnalisadorSintatico(
+                        new Yylex( new FileReader(args[0])));
+                Object result = asin.parse().value;
+                System.out.println("\n*** Resultados finais ***" );                                
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+/*
+        public static void main(String[] args) throws Exception{
+                new parser(new Yylex(System.in)).parse();       
+        }
+        public void syntax_error(Symbol s) {
+                report_error("Erro de sintaxe. Linha: " + (s.right + 1) +
+                "Coluna: " + s.left + ".Texto: \"" + s.value + "\"", null);
+        }*/
+:};
+
+/* Terminals (tokens returned by the scanner) */
+
+/* reserved words: */
+terminal BOOLEAN_TYPE;
+terminal INTEGER_TYPE;
+terminal STRING;
+terminal IF, ELSE, WHILE, RETURN;
+terminal CLASS, EXTENDS;
+terminal PUBLIC, STATIC, VOID, MAIN;
+terminal TRUE, FALSE, THIS;
+terminal LENGTH;
+terminal NEW;
+terminal SYSTEM_OUT_PRINTLN;
+
+/* operators and friends: */
+terminal PLUS, MINUS, TIMES, AND, LT, BECOMES, NOT, DOT, COMMA, EQUALS, NOT_EQUALS, BAR, NULL;
+
+/* delimiters: */
+terminal LBRACKET, RBRACKET,
+    LPAREN, RPAREN,
+    LBRACE, RBRACE,
+    SEMICOLON;
+
+/* tokens with values: */
+terminal String IDENTIFIER;
+terminal Integer INTEGER_LITERAL;
+
+/* Nonterminals */
+
+nonterminal Program;
+nonterminal StatementList;
+nonterminal MainClass;
+nonterminal MethodDecl;
+nonterminal MethodDeclList;
+nonterminal Statement;
+nonterminal Expression;
+nonterminal ArrayLookup;
+nonterminal ArrayLength;
+nonterminal Identifier;
+nonterminal Type;
+nonterminal VarDeclaration;
+nonterminal VarDeclarationList;
+nonterminal FormalParameter;
+nonterminal FormalParameterList;
+nonterminal FormalParameterListAndParens;
+nonterminal MethodInvocationParameterList;
+nonterminal ExpressionList;
+nonterminal ClassDecl;
+nonterminal ClassDeclList;
+
+/* Precedence declarations */
+
+precedence nonassoc BECOMES;
+precedence nonassoc AND;
+precedence nonassoc EQUALS;
+precedence nonassoc NOT_EQUALS;
+precedence left LT;
+precedence left ELSE;
+precedence left PLUS, MINUS;
+precedence left TIMES;
+precedence left BAR;
+precedence right NOT, NEW;
+precedence left DOT;
+
+/* Productions */
+
+Program ::= MainClass ClassDeclList     {: parentsList.add("Program"); childrenList.add("MainClass ClassDeclList"); System.out.println("Program ::= MainClass ClassDeclList"); :}
+;
+
+// Need to go backwards or things break. AST node type StatementList
+// ensures that the ordering all works later on.
+
+StatementList ::= Statement StatementList     {: parentsList.add("StatementList"); childrenList.add("Statement StatementList"); System.out.println("StatementList ::= Statement StatementList"); :}
+		|                             {: parentsList.add("StatementList"); childrenList.add("ε"); System.out.println("StatementList ::= ε"); :}
+;
+
+MainClass ::= CLASS Identifier LBRACE PUBLIC STATIC VOID MAIN LPAREN STRING LBRACKET RBRACKET Identifier RPAREN LBRACE Statement RBRACE RBRACE     {: parentsList.add("MainClass"); childrenList.add("CLASS Identifier LBRACE PUBLIC STATIC VOID MAIN LPAREN STRING LBRACKET RBRACKET Identifier RPAREN LBRACE Statement RBRACE RBRACE"); System.out.println("MainClass ::= CLASS Identifier LBRACE PUBLIC STATIC VOID MAIN LPAREN STRING LBRACKET RBRACKET Identifier RPAREN LBRACE Statement RBRACE RBRACE"); :}
+;
+
+ClassDecl ::= CLASS Identifier LBRACE VarDeclarationList MethodDeclList RBRACE                        {: parentsList.add("ClassDecl"); childrenList.add("CLASS Identifier LBRACE VarDeclarationList MethodDeclList RBRACE"); System.out.println("ClassDecl ::= CLASS Identifier LBRACE VarDeclarationList MethodDeclList RBRACE"); :}
+            | CLASS Identifier EXTENDS Identifier LBRACE VarDeclarationList MethodDeclList RBRACE     {: parentsList.add("ClassDecl"); childrenList.add("CLASS Identifier EXTENDS Identifier LBRACE VarDeclarationList MethodDeclList RBRACE"); System.out.println("ClassDecl ::= CLASS Identifier EXTENDS Identifier LBRACE VarDeclarationList MethodDeclList RBRACE"); :}
+;
+
+ClassDeclList ::=                             {: parentsList.add("ClassDeclList"); childrenList.add("ε"); System.out.println("ClassDeclList ::= ε"); :}
+                | ClassDecl ClassDeclList     {: parentsList.add("ClassDeclList"); childrenList.add("ClassDecl ClassDeclList"); System.out.println("ClassDeclList ::= ClassDecl ClassDeclList"); :}
+;
+
+MethodDeclList ::=                               {: parentsList.add("MethodDeclList"); childrenList.add("ε"); System.out.println("MethodDeclList ::= ε"); :}       
+                 | MethodDecl MethodDeclList     {: parentsList.add("MethodDeclList"); childrenList.add("MethodDecl MethodDeclList"); System.out.println("MethodDeclList ::= MethodDecl MethodDeclList"); :}
+;
+
+MethodDecl ::= PUBLIC Type Identifier FormalParameterListAndParens LBRACE VarDeclarationList StatementList RETURN Expression SEMICOLON RBRACE {: parentsList.add("MethodDecl"); childrenList.add("PUBLIC Type Identifier FormalParameterListAndParens LBRACE VarDeclarationList StatementList RETURN Expression SEMICOLON RBRACE"); System.out.println("MethodDecl ::= PUBLIC Type Identifier FormalParameterListAndParens LBRACE VarDeclarationList StatementList RETURN Expression SEMICOLON RBRACE"); :}
+            ;
+
+Statement ::= Identifier BECOMES Expression SEMICOLON                                  {: parentsList.add("Statement"); childrenList.add("Identifier BECOMES Expression SEMICOLON"); System.out.println("Statement ::= Identifier BECOMES Expression SEMICOLON"); :}
+            | IF LPAREN Expression RPAREN Statement ELSE Statement                     {: parentsList.add("Statement"); childrenList.add("IF LPAREN Expression RPAREN Statement ELSE Statement"); System.out.println("Statement ::= IF LPAREN Expression RPAREN Statement ELSE Statement"); :}
+            | IF LPAREN Expression RPAREN Statement                                    {: parentsList.add("Statement"); childrenList.add("IF LPAREN Expression RPAREN Statement"); System.out.println("Statement ::= IF LPAREN Expression RPAREN Statement"); :}
+            | SYSTEM_OUT_PRINTLN LPAREN Expression RPAREN SEMICOLON                    {: parentsList.add("Statement"); childrenList.add("SYSTEM_OUT_PRINTLN LPAREN Expression RPAREN SEMICOLON"); System.out.println("Statement ::= SYSTEM_OUT_PRINTLN LPAREN Expression RPAREN SEMICOLON"); :}
+            | Identifier LBRACKET Expression RBRACKET BECOMES Expression SEMICOLON     {: parentsList.add("Statement"); childrenList.add("Identifier LBRACKET Expression RBRACKET BECOMES Expression SEMICOLON"); System.out.println("Statement ::= Identifier LBRACKET Expression RBRACKET BECOMES Expression SEMICOLON"); :}
+            | WHILE LPAREN Expression RPAREN Statement                                 {: parentsList.add("Statement"); childrenList.add("WHILE LPAREN Expression RPAREN Statement"); System.out.println("Statement ::= WHILE LPAREN Expression RPAREN Statement"); :}           
+            | LBRACE StatementList RBRACE                                              {: parentsList.add("Statement"); childrenList.add("LBRACE StatementList RBRACE"); System.out.println("Statement ::= LBRACE StatementList RBRACE"); :}
+;
+
+Identifier ::= IDENTIFIER {: parentsList.add("Identifier"); childrenList.add("IDENTIFIER"); System.out.println("Identifier ::= IDENTIFIER"); :}
+;
+
+Expression ::= IDENTIFIER                                                  {: parentsList.add("Expression"); childrenList.add("IDENTIFIER"); System.out.println("Expression ::= IDENTIFIER"); :}  
+             | Expression PLUS Expression                                  {: parentsList.add("Expression"); childrenList.add("Expression PLUS Expression"); System.out.println("Expression ::= Expression PLUS Expression"); :}         
+             | Expression MINUS Expression                                 {: parentsList.add("Expression"); childrenList.add("Expression MINUS Expression"); System.out.println("Expression ::= Expression MINUS Expression"); :} 
+             | Expression TIMES Expression                                 {: parentsList.add("Expression"); childrenList.add("Expression TIMES Expression"); System.out.println("Expression ::= Expression TIMES Expression"); :} 
+             | Expression BAR Expression                                   {: parentsList.add("Expression"); childrenList.add("Expression BAR Expression"); System.out.println("Expression ::= Expression BAR Expression"); :} 
+             | Expression LT Expression                                    {: parentsList.add("Expression"); childrenList.add("Expression LT Expression"); System.out.println("Expression ::= Expression LT Expression"); :} 
+             | Expression EQUALS Expression                                {: parentsList.add("Expression"); childrenList.add("Expression EQUALS Expression"); System.out.println("Expression ::= Expression EQUALS Expression"); :} 
+             | Expression NOT_EQUALS Expression                            {: parentsList.add("Expression"); childrenList.add("Expression NOT_EQUALS Expression"); System.out.println("Expression ::= Expression NOT_EQUALS Expression"); :} 
+             | Expression AND Expression                                   {: parentsList.add("Expression"); childrenList.add("Expression AND Expression"); System.out.println("Expression ::= Expression AND Expression"); :} 
+             | LPAREN Expression RPAREN                                    {: parentsList.add("Expression"); childrenList.add("LPAREN Expression RPAREN"); System.out.println("Expression ::= LPAREN Expression RPAREN"); :} 
+             | MINUS Expression                                            {: parentsList.add("Expression"); childrenList.add("MINUS Expression"); System.out.println("Expression ::= MINUS Expression"); :} 
+             | NOT Expression                                              {: parentsList.add("Expression"); childrenList.add("NOT Expression"); System.out.println("Expression ::= NOT Expression"); :} 
+             | TRUE                                                        {: parentsList.add("Expression"); childrenList.add("TRUE"); System.out.println("Expression ::= TRUE"); :} 
+             | FALSE                                                       {: parentsList.add("Expression"); childrenList.add("FALSE"); System.out.println("Expression ::= FALSE"); :} 
+             | THIS                                                        {: parentsList.add("Expression"); childrenList.add("THIS"); System.out.println("Expression ::= THIS"); :} 
+             | NEW Identifier LPAREN RPAREN                                {: parentsList.add("Expression"); childrenList.add("NEW Identifier LPAREN RPAREN"); System.out.println("Expression ::= NEW Identifier LPAREN RPAREN"); :} 
+             | ArrayLength                                                 {: parentsList.add("Expression"); childrenList.add("ArrayLength"); System.out.println("Expression ::= ArrayLength"); :} 
+             | ArrayLookup                                                 {: parentsList.add("Expression"); childrenList.add("ArrayLookup"); System.out.println("Expression ::= ArrayLookup"); :} 
+             | NEW INTEGER_TYPE LBRACKET Expression RBRACKET               {: parentsList.add("Expression"); childrenList.add("NEW INTEGER_TYPE LBRACKET Expression RBRACKET"); System.out.println("Expression ::= NEW INTEGER_TYPE LBRACKET Expression RBRACKET"); :}  
+             | Expression DOT Identifier MethodInvocationParameterList     {: parentsList.add("Expression"); childrenList.add("Expression DOT Identifier MethodInvocationParameterList"); System.out.println("Expression ::= Expression DOT Identifier MethodInvocationParameterList"); :}            
+             | INTEGER_LITERAL                                             {: parentsList.add("Expression"); childrenList.add("INTEGER_LITERAL"); System.out.println("Expression ::= INTEGER_LITERAL"); :} 
+             | NULL                                                        {: parentsList.add("Expression"); childrenList.add("NULL"); System.out.println("Expression ::= NULL"); :} 
+;
+
+ArrayLength ::= Expression DOT LENGTH      {: parentsList.add("ArrayLength"); childrenList.add("Expression DOT LENGTH"); System.out.println("ArrayLength ::= Expression DOT LENGTH"); :} 
+;
+
+ArrayLookup ::= Expression LBRACKET Expression RBRACKET     {: parentsList.add("ArrayLookup"); childrenList.add("Expression LBRACKET Expression RBRACKET"); System.out.println("ArrayLookup ::= Expression LBRACKET Expression RBRACKET"); :}
+;
+
+Type ::= INTEGER_TYPE                       {: parentsList.add("Type"); childrenList.add("INTEGER_TYPE"); System.out.println("Type ::= INTEGER_TYPE "); :}
+       | BOOLEAN_TYPE                       {: parentsList.add("Type"); childrenList.add("BOOLEAN_TYPE"); System.out.println("Type ::= BOOLEAN_TYPE"); :} 
+       | Identifier                         {: parentsList.add("Type"); childrenList.add("Identifier"); System.out.println("Type ::= Identifier "); :}
+       | INTEGER_TYPE LBRACKET RBRACKET     {: parentsList.add("Type"); childrenList.add("INTEGER_TYPE LBRACKET RBRACKET"); System.out.println("Type ::= INTEGER_TYPE LBRACKET RBRACKET"); :}
+;
+
+VarDeclaration ::= Type Identifier SEMICOLON {: parentsList.add("VarDeclaration"); childrenList.add("Type Identifier SEMICOLON"); System.out.println("VarDeclaration ::= Type Identifier SEMICOLON"); :}
+;
+
+VarDeclarationList ::=                                       {: parentsList.add("VarDeclarationList"); childrenList.add("ε"); System.out.println("VarDeclarationList ::= ε"); :}
+                     | VarDeclarationList VarDeclaration     {: parentsList.add("VarDeclarationList"); childrenList.add("VarDeclarationList VarDeclaration"); System.out.println("VarDeclarationList ::= VarDeclarationList VarDeclaration"); :}
+;
+
+FormalParameter ::= Type Identifier     {: parentsList.add("FormalParameter"); childrenList.add("Type Identifier"); System.out.println("FormalParameter ::= Type Identifier"); :}
+;
+
+FormalParameterListAndParens ::= LPAREN RPAREN                         {: parentsList.add("FormalParameterListAndParens"); childrenList.add("LPAREN RPAREN"); System.out.println("FormalParameterListAndParens ::= LPAREN RPAREN"); :}
+                               | LPAREN FormalParameterList RPAREN     {: parentsList.add("FormalParameterListAndParens"); childrenList.add("LPAREN FormalParameterList RPAREN"); System.out.println("FormalParameterListAndParens ::= LPAREN FormalParameterList RPAREN"); :}
+;
+
+FormalParameterList ::= FormalParameter COMMA FormalParameterList     {: parentsList.add("FormalParameterList"); childrenList.add("FormalParameter COMMA FormalParameterList"); System.out.println("FormalParameterList ::= FormalParameter COMMA FormalParameterList"); :}
+                      | FormalParameter                               {: parentsList.add("FormalParameterList"); childrenList.add("FormalParameter"); System.out.println("FormalParameterList ::= FormalParameter"); :}
+;
+
+MethodInvocationParameterList ::= LPAREN RPAREN                    {: parentsList.add("MethodInvocationParameterList"); childrenList.add("LPAREN RPAREN"); System.out.println("MethodInvocationParameterList ::= LPAREN RPAREN" ); :}       
+                                | LPAREN ExpressionList RPAREN     {: parentsList.add("MethodInvocationParameterList"); childrenList.add("LPAREN ExpressionList RPAREN"); System.out.println("MethodInvocationParameterList ::= LPAREN ExpressionList RPAREN"); :}  
+;
+
+ExpressionList ::= Expression                          {: parentsList.add("ExpressionList"); childrenList.add("Expression"); System.out.println("ExpressionList ::= Expression   " ); :}  
+                 | Expression COMMA ExpressionList     {: parentsList.add("ExpressionList"); childrenList.add("Expression COMMA ExpressionList"); System.out.println("ExpressionList ::= Expression COMMA ExpressionList" ); :} 
+;
